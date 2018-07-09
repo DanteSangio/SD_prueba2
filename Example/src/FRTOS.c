@@ -91,12 +91,23 @@ void uC_StartUp (void)
 static void vTaskPulsadores(void *pvParameters)
 {
 	uint8_t envio=0;
+	uint8_t estado = 0; //Estado apagado 0 prendido 1
 	while (1)
 	{
 		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_ON,PUL_ON_PIN))
 		{
-			xSemaphoreGive(Semaforo_On );
-			vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg hasta que suelte el pulsador
+			if(!estado)//si esta apagado
+			{
+				xSemaphoreGive(Semaforo_On );//Prendo el PWM
+				estado = 1;
+				vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg para que suelte el pulsador
+			}
+			if(estado)//si esta prendido
+			{
+				xSemaphoreTake(Semaforo_On , portMAX_DELAY );//Apago el PWM
+				estado = 0;
+				vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg para que suelte el pulsador
+			}
 		}
 
 		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_90,PUL_90_PIN))
@@ -133,6 +144,8 @@ static void vTaskEmergencia(void *pvParameters)
 			xSemaphoreTake(Semaforo_On , portMAX_DELAY );// en caso de parada de emergencia tomo el semaforo de funcionamiento
 			envio = 20; //Frecuencia a la que tiene que parpadear el led*10 (así utilizo enteros)
 			xQueueSendToBack(Cola_LED, &envio, portMAX_DELAY);//Lo envio a la cola que maneja la F del led
+			Chip_TIMER_Disable (LPC_TIMER0); //Deshabilito el timer
+			Chip_GPIO_SetPinOutLow (LPC_GPIO , MOTOR , MOTOR_PIN); //Apago la salida
 			vTaskDelay(1000/portTICK_RATE_MS); //Delay de 1 seg para que se ejecuten las otras acciones
 		}
 		if(Chip_GPIO_GetPinState(LPC_GPIO, FAULT, FAULT_PIN))
@@ -140,6 +153,8 @@ static void vTaskEmergencia(void *pvParameters)
 			xSemaphoreTake(Semaforo_On , portMAX_DELAY );// en caso de parada de emergencia tomo el semaforo de funcionamiento
 			envio = 5; //Frecuencia a la que tiene que parpadear el led*10 (así utilizo enteros)
 			xQueueSendToBack(Cola_LED, &envio, portMAX_DELAY);//Lo envio a la cola que maneja la F del led
+			Chip_TIMER_Disable (LPC_TIMER0); //Deshabilito el timer
+			Chip_GPIO_SetPinOutLow (LPC_GPIO , MOTOR , MOTOR_PIN); //Apago la salida
 			vTaskDelay(1000/portTICK_RATE_MS); //Delay de 1 seg para que se ejecuten las otras acciones
 		}
 	}
