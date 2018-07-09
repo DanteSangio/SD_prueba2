@@ -151,7 +151,6 @@ static void vTaskEmergencia(void *pvParameters)
 */
 static void xTaskMatch0(void *pvParameters)
 {
-	uint8_t Ticks_HZ_Match0 = 0;//el PWM inicializa en 0
 	uint8_t Receive=0;
 	uint32_t timerFreq;
 
@@ -196,10 +195,9 @@ static void xTaskPWM(void *pvParameters)
 
 	while (1)
 	{
+		xSemaphoreTake(Semaforo_PWM, portMAX_DELAY);//Tomo el semaforo del PWM - debe liberarlo la interrupcion
 		xSemaphoreTake(Semaforo_On , portMAX_DELAY );//Intento tomar semaforo de encendido, caso de no poder espero hasta que lo este
 		xSemaphoreGive(Semaforo_On);//Entrego el semaforo para el caso que se apriete el boton de apagado
-
-		xSemaphoreTake(Semaforo_PWM, portMAX_DELAY);//Tomo el semaforo del PWM - debe liberarlo la interrupcion
 		Chip_GPIO_SetPinToggle(LPC_GPIO,MOTOR, MOTOR_PIN);
 	}
 	vTaskDelete(NULL);	//Borra la tarea si sale del while 1
