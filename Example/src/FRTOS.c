@@ -19,7 +19,6 @@
 
 SemaphoreHandle_t Semaforo_On;
 SemaphoreHandle_t Semaforo_PWM;
-QueueHandle_t Cola_PWM;
 QueueHandle_t Cola_LED;
 
 // TODO: insert other include files here
@@ -90,21 +89,27 @@ void uC_StartUp (void)
 /* ENTRADAS CON MENOR PRIORIDAD */
 static void vTaskPulsadores(void *pvParameters)
 {
-	uint8_t envio=0;
+	uint8_t envio=50;
 	uint8_t estado = 0; //Estado apagado 0 prendido 1
+	uint32_t timerFreq;
 	while (1)
 	{
+		vTaskDelay( 50 / portTICK_PERIOD_MS );//Muestreo cada 50 mseg
+
 		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_ON,PUL_ON_PIN))
 		{
 			if(!estado)//si esta apagado
 			{
+
 				xSemaphoreGive(Semaforo_On );//Prendo el PWM
+				Chip_TIMER_Enable (LPC_TIMER0); //Habilito el timer
 				estado = 1;
 				vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg para que suelte el pulsador
 			}
 			if(estado)//si esta prendido
 			{
-				xSemaphoreTake(Semaforo_On , portMAX_DELAY );//Apago el PWM
+				xSemaphoreTake(Semaforo_On , portMAX_DELAY );//Tomo el semaforo del PWM
+				Chip_TIMER_Disable (LPC_TIMER0); //Deshabilito el timer
 				Chip_GPIO_SetPinOutLow (LPC_GPIO , MOTOR , MOTOR_PIN); //Apago la salida
 				estado = 0;
 				vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg para que suelte el pulsador
@@ -114,23 +119,24 @@ static void vTaskPulsadores(void *pvParameters)
 		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_90,PUL_90_PIN))
 		{
 			envio = 90; //Porcentaje del PWM
-			xQueueSendToBack(Cola_PWM, &envio, portMAX_DELAY);
 			vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg hasta que suelte el pulsador
 		}
 
 		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_70, PUL_70_PIN))
 		{
 			envio = 70; //Porcentaje del PWM
-			xQueueSendToBack(Cola_PWM, &envio, portMAX_DELAY);
 			vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg hasta que suelte el pulsador
 		}
 
 		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_50, PUL_50_PIN))
 		{
 			envio = 50; //Porcentaje del PWM
-			xQueueSendToBack(Cola_PWM, &envio, portMAX_DELAY);
 			vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg hasta que suelte el pulsador
 		}
+
+		timerFreq = Chip_Clock_GetSystemClockRate();	//Obtiene la frecuencia a la que esta corriendo el uC
+		//Como quiero el x% de duty sera 1/x la F a trabajar yel dividido 100 es por el porcentaje
+		Chip_TIMER_SetMatch(LPC_TIMER0, 0, (timerFreq /(TICKRATE_HZ2 * (1/envio/100) )));
 	}
 }
 
@@ -161,29 +167,6 @@ static void vTaskEmergencia(void *pvParameters)
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/* xTaskMatch0:
-* Tarea que se encarga de controlar el % de tiempo encendido o apagada la salida
-*/
-static void xTaskMatch0(void *pvParameters)
-{
-	uint8_t Receive=0;
-	uint32_t timerFreq;
-
-	while (1)
-	{
-		xQueueReceive(Cola_PWM,&Receive,portMAX_DELAY);	//Para recibir de la Cola_1
-
-		if(Receive)//Receive esta en porcentaje
-		{
-			timerFreq = Chip_Clock_GetSystemClockRate();	//Obtiene la frecuencia a la que esta corriendo el uC
-			//Como quiero el x% de duty sera 1/x la F a trabajar yel dividido 100 es por el porcentaje
-			Chip_TIMER_SetMatch(LPC_TIMER0, 0, (timerFreq /(TICKRATE_HZ2 * (1/Receive/100) )));
-			Receive=0;										//Reestablece la variable
-		}
-	}
-	vTaskDelete(NULL);	//Borra la tarea si sale del while 1
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* xTaskLed:
@@ -198,7 +181,7 @@ static void xTaskLed(void *pvParameters)
 	while (1)
 	{
 		Chip_GPIO_SetPinToggle(LPC_GPIO,LED_EMER,LED_EMER_PIN);
-		vTaskDelay((1/Receive/10)/portTICK_RATE_MS); //Parpadeo del led a una f receive/10
+		vTaskDelay((1000/Receive/10)/portTICK_RATE_MS); //Parpadeo del led a una f receive/10
 	}
 	vTaskDelete(NULL);	//Borra la tarea si sale del while 1
 }
@@ -246,7 +229,7 @@ static void vTaskInicTimer(void *pvParameters)
 		Chip_TIMER_SetMatch(LPC_TIMER0, 1, (timerFreq / TICKRATE_HZ2));	//Le asigna un valor al match - seteo la frec a la que quiero que el timer me interrumpa (Ej 1s)
 		Chip_TIMER_ResetOnMatchEnable(LPC_TIMER0, 1);					//Cada vez que llega al match resetea la cuenta
 
-		Chip_TIMER_Enable(LPC_TIMER0);									//Comienza a contar
+		//Chip_TIMER_Enable(LPC_TIMER0);									//Comienza a contar (hago que se habilite al encender)
 		/* Enable timer interrupt */ 		//El NVIC asigna prioridades de las interrupciones (prioridad de 0 a inf)
 		NVIC_ClearPendingIRQ(TIMER0_IRQn);
 		NVIC_EnableIRQ(TIMER0_IRQn);		//Enciende la interrupcion que acabamos de configurar
@@ -292,8 +275,7 @@ int main(void)
 	vSemaphoreCreateBinary(Semaforo_On);
 	vSemaphoreCreateBinary(Semaforo_PWM);
 
-	Cola_PWM = xQueueCreate(1, sizeof(uint8_t));	//Creación de una cola de tamaño 1 y tipo uint8
-	Cola_PWM = xQueueCreate(1, sizeof(uint8_t));	//Creación de una cola de tamaño 1 y tipo uint8
+	Cola_LED = xQueueCreate(1, sizeof(uint8_t));	//Creación de una cola de tamaño 1 y tipo uint8
 
 
 	xSemaphoreTake(Semaforo_On , portMAX_DELAY );//semaforo de encendido
@@ -303,7 +285,7 @@ int main(void)
 	 * TAREA CON MAYOR PRIORIDAD (+2UL) QUE INICIALIZA EL TIMER Y LUEGO SE AUTOELIMINA
 	 * */
 	xTaskCreate(vTaskInicTimer, (char *) "vTaskInicTimer",
-				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 3UL),
+				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 4UL),
 				(xTaskHandle *) NULL);
 
 	xTaskCreate(vTaskPulsadores, (char *) "vTaskPulsadores",
@@ -311,11 +293,7 @@ int main(void)
 				(xTaskHandle *) NULL);
 
 	xTaskCreate(vTaskEmergencia, (char *) "vTaskEmergencia",
-				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 2UL),
-				(xTaskHandle *) NULL);
-
-	xTaskCreate(xTaskMatch0, (char *) "xTaskMatch0",
-				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 1UL),
+				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 3UL),
 				(xTaskHandle *) NULL);
 
 	xTaskCreate(xTaskLed, (char *) "xTaskLed",
@@ -323,7 +301,7 @@ int main(void)
 				(xTaskHandle *) NULL);
 
 	xTaskCreate(xTaskPWM, (char *) "xTaskPWM",
-				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 1UL),
+				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 2UL),
 				(xTaskHandle *) NULL);
 
 	/* Start the scheduler */
