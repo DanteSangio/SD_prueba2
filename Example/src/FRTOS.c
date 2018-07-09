@@ -105,6 +105,7 @@ static void vTaskPulsadores(void *pvParameters)
 			if(estado)//si esta prendido
 			{
 				xSemaphoreTake(Semaforo_On , portMAX_DELAY );//Apago el PWM
+				Chip_GPIO_SetPinOutLow (LPC_GPIO , MOTOR , MOTOR_PIN); //Apago la salida
 				estado = 0;
 				vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg para que suelte el pulsador
 			}
