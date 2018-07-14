@@ -17,38 +17,55 @@
 #include <cr_section_macros.h>
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-SemaphoreHandle_t Semaforo_On;
 SemaphoreHandle_t Semaforo_PWM;
-QueueHandle_t Cola_LED;
+SemaphoreHandle_t Semaforo_CAR;
+SemaphoreHandle_t Semaforo_MET;
+SemaphoreHandle_t Semaforo_NOR;
+
+
 
 // TODO: insert other include files here
 
 // TODO: insert other definitions and declarations here
 #define PORT(x) 	((uint8_t) x)
 #define PIN(x)		((uint8_t) x)
-#define TICKRATE_HZ1 (4*2)	// 4: cte de frec - 2 ticks por segundo
-#define TICKRATE_HZ2 (4*20000)	// 4: cte de frec -  tick por segundo
+#define TICKRATE_HZ1 (20000)	// 20000 ticks por segundo
+#define TICKRATE_HZ2 (10000)	// 10000 tick por segundo
 
 
-/*	Definiciones pines joystick	*/
-#define PUL_ON		((uint8_t) 0)//centro del joystick
-#define PUL_90		((uint8_t) 2)
-#define PUL_70		((uint8_t) 0)
-#define PUL_50		((uint8_t) 0)
-#define PUL_EMER	((uint8_t) 0)
-#define FAULT		((uint8_t) 1)//wakeup de base board pin que recibe si el motor esta tomando sobre corriente
-#define LED_EMER	((uint8_t) 2)//LED EMERGENCIA
-#define MOTOR	((uint8_t) 0)//SALIDA DEL MOTOR ( NO ES UNA CONEXION QUE FUNCIONE)
+
+#define PUL_FOR		((uint8_t) 2)
+#define PUL_BACK	((uint8_t) 2)
+#define PUL_LEFT	((uint8_t) 0)
+#define PUL_RIG		((uint8_t) 0)
+#define PUL_STOP	((uint8_t) 0)
+#define AL_CARB		((uint8_t) 2)
+#define AL_MET		((uint8_t) 1)
+#define PUL_CUAD1	((uint8_t) 0)
+#define PUL_CUAD2	((uint8_t) 0)
+
+#define LED_GASES	((uint8_t) 2)//LED Indicador de gases
+#define MOTOR		((uint8_t) 0)//SALIDA DEL PWM
+#define SAL_IZQ		((uint8_t) 0)
+#define SAL_DER		((uint8_t) 0)
+#define SAL_FOR		((uint8_t) 2)
 
 
-#define PUL_ON_PIN			((uint8_t) 17)
-#define PUL_90_PIN			((uint8_t) 3)
-#define PUL_70_PIN			((uint8_t) 16)
-#define PUL_50_PIN			((uint8_t) 15)
-#define PUL_EMER_PIN		((uint8_t) 15)
-#define FAULT_PIN			((uint8_t) 31)
-#define LED_EMER_PIN		((uint8_t) 0)
-#define MOTOR_PIN			((uint8_t) 22)
+#define PUL_FOR_PIN			((uint8_t) 4)
+#define PUL_BACK_PIN		((uint8_t) 3)
+#define PUL_LEFT_PIN		((uint8_t) 16)
+#define PUL_RIG_PIN			((uint8_t) 15)
+#define PUL_STOP_PIN		((uint8_t) 17)
+#define AL_CARB_PIN			((uint8_t) 10)
+#define AL_MET_PIN			((uint8_t) 31)
+#define PUL_CUAD1_PIN		((uint8_t) 24)
+#define PUL_CUAD2_PIN		((uint8_t) 25)
+
+#define LED_GASES_PIN		((uint8_t) 1)
+#define MOTOR_PIN			((uint8_t) 26)
+#define SAL_IZQ_PIN		((uint8_t) 1)
+#define SAL_DER_PIN		((uint8_t) 2)
+#define SAL_FOR_PIN		((uint8_t) 0)
 
 /*	Fin Definiciones pines	*/
 
@@ -58,133 +75,212 @@ QueueHandle_t Cola_LED;
 #define ON			((uint8_t) 1)
 #define OFF			((uint8_t) 0)
 
+typedef struct
+{
+	uint32_t 	Ton;
+	uint32_t 	Toff;
+	SemaphoreHandle_t semaforo;
+}LED_GPIO;
+
+LED_GPIO LED_Struct;
+
 void uC_StartUp (void)
 {
 	Chip_GPIO_Init (LPC_GPIO);
 
-	Chip_IOCON_PinMux (LPC_IOCON , PUL_ON , PUL_ON_PIN, IOCON_MODE_PULLDOWN , IOCON_FUNC0);
-	Chip_IOCON_PinMux (LPC_IOCON , PUL_90 , PUL_90_PIN, IOCON_MODE_PULLDOWN , IOCON_FUNC0);
-	Chip_IOCON_PinMux (LPC_IOCON , PUL_70 , PUL_70_PIN, IOCON_MODE_PULLDOWN , IOCON_FUNC0);
-	Chip_IOCON_PinMux (LPC_IOCON , PUL_50 , PUL_50_PIN, IOCON_MODE_PULLDOWN , IOCON_FUNC0);
-	Chip_IOCON_PinMux (LPC_IOCON , PUL_EMER , PUL_EMER_PIN, IOCON_MODE_PULLDOWN , IOCON_FUNC0);
-	Chip_IOCON_PinMux (LPC_IOCON , FAULT , FAULT_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
-	Chip_IOCON_PinMux (LPC_IOCON , LED_EMER , LED_EMER_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , PUL_FOR , PUL_FOR_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , PUL_BACK , PUL_BACK_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , PUL_LEFT , PUL_LEFT_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , PUL_RIG , PUL_RIG_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , PUL_STOP , PUL_STOP_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , AL_CARB , AL_CARB_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , AL_MET , AL_MET_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , PUL_CUAD1 , PUL_CUAD1_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , PUL_CUAD2 , PUL_CUAD2_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+
+	Chip_IOCON_PinMux (LPC_IOCON , LED_GASES , LED_GASES_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
 	Chip_IOCON_PinMux (LPC_IOCON , MOTOR , MOTOR_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , SAL_IZQ , SAL_IZQ_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , SAL_DER , SAL_DER_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
+	Chip_IOCON_PinMux (LPC_IOCON , SAL_FOR , SAL_FOR_PIN, IOCON_MODE_INACT , IOCON_FUNC0);
 
+	Chip_GPIO_SetDir (LPC_GPIO , PUL_FOR , PUL_FOR_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , PUL_BACK , PUL_BACK_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , PUL_LEFT , PUL_LEFT_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , PUL_RIG , PUL_RIG_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , PUL_STOP , PUL_STOP_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , AL_CARB , AL_CARB_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , AL_MET , AL_MET_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , PUL_CUAD1 , PUL_CUAD1_PIN , INPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , PUL_CUAD2 , PUL_CUAD2_PIN , INPUT);
 
-	Chip_GPIO_SetDir (LPC_GPIO , PUL_ON , PUL_ON_PIN , INPUT);
-	Chip_GPIO_SetDir (LPC_GPIO , PUL_90 , PUL_90_PIN , INPUT);
-	Chip_GPIO_SetDir (LPC_GPIO , PUL_70 , PUL_70_PIN , INPUT);
-	Chip_GPIO_SetDir (LPC_GPIO , PUL_50 , PUL_50_PIN , INPUT);
-	Chip_GPIO_SetDir (LPC_GPIO , PUL_EMER , PUL_EMER_PIN , INPUT);
-	Chip_GPIO_SetDir (LPC_GPIO , FAULT , FAULT_PIN , INPUT);
-	Chip_GPIO_SetDir (LPC_GPIO , LED_EMER , LED_EMER_PIN , OUTPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , LED_GASES , LED_GASES_PIN , OUTPUT);
 	Chip_GPIO_SetDir (LPC_GPIO , MOTOR , MOTOR_PIN , OUTPUT);
-
-
+	Chip_GPIO_SetDir (LPC_GPIO , SAL_IZQ , SAL_IZQ_PIN , OUTPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , SAL_DER , SAL_DER_PIN , OUTPUT);
+	Chip_GPIO_SetDir (LPC_GPIO , SAL_FOR , SAL_FOR_PIN , OUTPUT);
 
 }
 
 
-/* ENTRADAS CON MENOR PRIORIDAD */
+/* ENTRADAS */
 static void vTaskPulsadores(void *pvParameters)
 {
 	uint8_t envio=50;
-	uint8_t estado = 0; //Estado apagado 0 prendido 1
-	uint32_t timerFreq;
+	uint8_t estadoPWM = 0; //Estado del PWM
+	uint8_t estadoEnc = 0; //Estado del encoder escrito en binario
+	uint8_t estadoEncPrevio = 0; //Estado previo del encoder escrito en binario
+	uint32_t TestigoStop = FALSE;
+	uint32_t TestigoLeft = FALSE;
+	uint32_t TestigoRight = FALSE;
+	uint32_t TestigoFor = FALSE;
+	uint32_t TestigoBack = FALSE;
+
+
+	//Leo el encoder 1 vez para saber donde inicia
+	estadoEnc = 2*Chip_GPIO_GetPinState(LPC_GPIO, PUL_CUAD1, PUL_CUAD2_PIN);//suma 2 si esta en 1
+	if(!Chip_GPIO_GetPinState(LPC_GPIO, PUL_CUAD2, PUL_CUAD2_PIN))
+	estadoEnc = estadoEnc + 1; //suma 1 si esta en 0 caso contrario no suma nada
+	estadoEncPrevio = estadoEnc;
+	//Estados del encoder 00-> 0 01-> 1 11-> 2 10-> 3
+
 	while (1)
 	{
 		vTaskDelay( 50 / portTICK_PERIOD_MS );//Muestreo cada 50 mseg
 
-		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_ON,PUL_ON_PIN))
+		//Control de stop
+		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_STOP, PUL_STOP_PIN) && TestigoStop == FALSE)
 		{
-			if(!estado)//si esta apagado
+			if(!estadoPWM)//si esta apagado
 			{
-
-				xSemaphoreGive(Semaforo_On );//Prendo el PWM
 				Chip_TIMER_Enable (LPC_TIMER0); //Habilito el timer
-				estado = 1;
-				vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg para que suelte el pulsador
+				estadoPWM = 1;
+				TestigoStop = TRUE;
 			}
-			if(estado)//si esta prendido
+			if(estadoPWM)//si esta prendido
 			{
-				xSemaphoreTake(Semaforo_On , portMAX_DELAY );//Tomo el semaforo del PWM
 				Chip_TIMER_Disable (LPC_TIMER0); //Deshabilito el timer
 				Chip_GPIO_SetPinOutLow (LPC_GPIO , MOTOR , MOTOR_PIN); //Apago la salida
-				estado = 0;
-				vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg para que suelte el pulsador
+				estadoPWM = 0;
+				TestigoStop = TRUE;
 			}
 		}
+		if (Chip_GPIO_GetPinState (LPC_GPIO , PUL_STOP , PUL_STOP_PIN) == FALSE)
+			TestigoStop = FALSE;
 
-		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_90,PUL_90_PIN))
+		//Control izquierda
+		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_LEFT, PUL_LEFT_PIN) && TestigoLeft == FALSE)
 		{
-			envio = 90; //Porcentaje del PWM
-			vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg hasta que suelte el pulsador
+			Chip_GPIO_SetPinOutLow (LPC_GPIO , SAL_DER , SAL_DER_PIN); //Apago la salida derecha
+			Chip_GPIO_SetPinOutHigh (LPC_GPIO , SAL_IZQ , SAL_IZQ_PIN); //Prendo la salida izquierda
+			TestigoLeft = TRUE;
+		}
+		if (Chip_GPIO_GetPinState (LPC_GPIO , PUL_LEFT , PUL_LEFT_PIN) == FALSE)
+			TestigoLeft = FALSE;
+
+		//Control derecha
+		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_RIG, PUL_RIG_PIN) && TestigoRight == FALSE)
+		{
+			Chip_GPIO_SetPinOutLow (LPC_GPIO , SAL_IZQ , SAL_IZQ_PIN); //Apago la salida izquierda
+			Chip_GPIO_SetPinOutHigh (LPC_GPIO , SAL_DER , SAL_DER_PIN); //Prendo la salida derecha
+			TestigoRight = TRUE;
+		}
+		if (Chip_GPIO_GetPinState (LPC_GPIO , PUL_RIG , PUL_RIG_PIN) == FALSE)
+			TestigoRight = FALSE;
+
+		//Control adelante
+		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_FOR, PUL_FOR_PIN) && TestigoFor == FALSE)
+		{
+			Chip_GPIO_SetPinOutHigh (LPC_GPIO , SAL_FOR , SAL_FOR_PIN); //Prendo la salida derecha
+			TestigoFor = TRUE;
+		}
+		if (Chip_GPIO_GetPinState (LPC_GPIO , PUL_FOR , PUL_FOR_PIN) == FALSE)
+			TestigoFor = FALSE;
+
+		//Control reversa
+		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_BACK, PUL_BACK_PIN) && TestigoBack == FALSE)
+		{
+			Chip_GPIO_SetPinOutLow (LPC_GPIO , SAL_FOR , SAL_FOR_PIN); //Prendo la salida derecha
+			TestigoBack = TRUE;
+		}
+		if (Chip_GPIO_GetPinState (LPC_GPIO , PUL_BACK , PUL_BACK_PIN) == FALSE)
+			TestigoBack = FALSE;
+
+		//Encoder
+		estadoEnc = 2*Chip_GPIO_GetPinState(LPC_GPIO, PUL_CUAD1, PUL_CUAD2_PIN);//suma 2 si esta en 1
+		if(!Chip_GPIO_GetPinState(LPC_GPIO, PUL_CUAD2, PUL_CUAD2_PIN))
+		estadoEnc = estadoEnc + 1; //suma 1 si esta en 0 caso contrario no suma nada
+		//Estados del encoder 00-> 0 01-> 1 11-> 2 10-> 3
+
+		if (estadoEnc != estadoEncPrevio) // hubo una variación en el encoder
+		{
+			if(estadoEnc < estadoEncPrevio || (estadoEnc == 3 && estadoEncPrevio == 0) )
+			{
+				if(envio < 90)
+				envio = envio + 10; //envio contiene el porcentaje del PWM
+
+				estadoEncPrevio = estadoEnc;
+			}
+
+			if(estadoEnc > estadoEncPrevio || (estadoEnc == 0 && estadoEncPrevio == 3) )
+			{
+				if(envio > 10)
+				envio = envio - 10; //envio contiene el porcentaje del PWM
+
+				estadoEncPrevio = estadoEnc;
+			}
+
+			//Como quiero el x% de duty sera 1/x la F a trabajar yel dividido 100 es por el porcentaje
+			Chip_TIMER_SetMatch(LPC_TIMER0, 0, ((SystemCoreClock / 4) /(TICKRATE_HZ2 * (1/envio/100) )));
 		}
 
-		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_70, PUL_70_PIN))
+
+		//Analizo pulsadores de alarma
+		if(Chip_GPIO_GetPinState(LPC_GPIO, AL_CARB, AL_CARB_PIN))
 		{
-			envio = 70; //Porcentaje del PWM
-			vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg hasta que suelte el pulsador
+			xSemaphoreGive(Semaforo_CAR);//Doy el semaforo en caso de que el led tenga que encenderse por carbono
 		}
 
-		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_50, PUL_50_PIN))
+		else if (Chip_GPIO_GetPinState(LPC_GPIO, AL_MET, AL_MET_PIN))
 		{
-			envio = 50; //Porcentaje del PWM
-			vTaskDelay( 3000 / portTICK_PERIOD_MS );//Delay de 3 seg hasta que suelte el pulsador
+			xSemaphoreGive(Semaforo_MET);//Doy el semaforo en caso de que el led tenga que encenderse por carbono
+		}
+		else//Significa que no hay ninguna alarma
+		{
+			xSemaphoreGive(Semaforo_NOR);//Doy el semaforo en caso de que el led tenga que encenderse por carbono
 		}
 
-		timerFreq = Chip_Clock_GetSystemClockRate();	//Obtiene la frecuencia a la que esta corriendo el uC
-		//Como quiero el x% de duty sera 1/x la F a trabajar yel dividido 100 es por el porcentaje
-		Chip_TIMER_SetMatch(LPC_TIMER0, 0, (timerFreq /(TICKRATE_HZ2 * (1/envio/100) )));
-	}
-}
 
-/* ENTRADAS CON MAYOR PRIORIDAD */
-static void vTaskEmergencia(void *pvParameters)
-{
-	uint8_t envio=0;
-	while (1)
-	{
-		if(Chip_GPIO_GetPinState(LPC_GPIO, PUL_EMER, PUL_EMER_PIN))
-		{
-			xSemaphoreTake(Semaforo_On , portMAX_DELAY );// en caso de parada de emergencia tomo el semaforo de funcionamiento
-			envio = 20; //Frecuencia a la que tiene que parpadear el led*10 (así utilizo enteros)
-			xQueueSendToBack(Cola_LED, &envio, portMAX_DELAY);//Lo envio a la cola que maneja la F del led
-			Chip_TIMER_Disable (LPC_TIMER0); //Deshabilito el timer
-			Chip_GPIO_SetPinOutLow (LPC_GPIO , MOTOR , MOTOR_PIN); //Apago la salida
-			vTaskDelay(1000/portTICK_RATE_MS); //Delay de 1 seg para que se ejecuten las otras acciones
-		}
-		if(Chip_GPIO_GetPinState(LPC_GPIO, FAULT, FAULT_PIN))
-		{
-			xSemaphoreTake(Semaforo_On , portMAX_DELAY );// en caso de parada de emergencia tomo el semaforo de funcionamiento
-			envio = 5; //Frecuencia a la que tiene que parpadear el led*10 (así utilizo enteros)
-			xQueueSendToBack(Cola_LED, &envio, portMAX_DELAY);//Lo envio a la cola que maneja la F del led
-			Chip_TIMER_Disable (LPC_TIMER0); //Deshabilito el timer
-			Chip_GPIO_SetPinOutLow (LPC_GPIO , MOTOR , MOTOR_PIN); //Apago la salida
-			vTaskDelay(1000/portTICK_RATE_MS); //Delay de 1 seg para que se ejecuten las otras acciones
-		}
 	}
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/* xTaskLed:
+/* xTaskLed1:
 * Tarea que se encarga de controlar el tiempo encendido o apagada la salida
 */
+
+//INCOMPLETA faltaria tarea que instancia.
 static void xTaskLed(void *pvParameters)
 {
-	uint8_t Receive=0;
 
-	xQueueReceive(Cola_LED,&Receive,portMAX_DELAY);	//Para recibir de la Cola_Led la f*10 de trabajo
+	LED_GPIO * Buffer;
+
+	Buffer = (LED_GPIO*) pvParameters;
+
 
 	while (1)
 	{
-		Chip_GPIO_SetPinToggle(LPC_GPIO,LED_EMER,LED_EMER_PIN);
-		vTaskDelay((1000/Receive/10)/portTICK_RATE_MS); //Parpadeo del led a una f receive/10
+		xSemaphoreTake(Buffer->semaforo , portMAX_DELAY );
+		Chip_GPIO_SetPinOutLow (LPC_GPIO , LED_GASES , LED_GASES_PIN); //Apago la salida del led
+		vTaskDelay( Buffer->Ton / portTICK_PERIOD_MS );
+		xSemaphoreTake(Buffer->semaforo , portMAX_DELAY );
+		Chip_GPIO_SetPinOutHigh (LPC_GPIO , LED_GASES , LED_GASES_PIN); //Prendo la salida del led
+		vTaskDelay( Buffer->Toff / portTICK_PERIOD_MS );
 	}
 	vTaskDelete(NULL);	//Borra la tarea si sale del while 1
 }
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* xTaskPWM:
 * Tarea que se encarga de controlar el tiempo encendido o apagada la salida
@@ -195,8 +291,6 @@ static void xTaskPWM(void *pvParameters)
 	while (1)
 	{
 		xSemaphoreTake(Semaforo_PWM, portMAX_DELAY);//Tomo el semaforo del PWM - debe liberarlo la interrupcion
-		xSemaphoreTake(Semaforo_On , portMAX_DELAY );//Intento tomar semaforo de encendido, caso de no poder espero hasta que lo este
-		xSemaphoreGive(Semaforo_On);//Entrego el semaforo para el caso que se apriete el boton de apagado
 		Chip_GPIO_SetPinToggle(LPC_GPIO,MOTOR, MOTOR_PIN);
 	}
 	vTaskDelete(NULL);	//Borra la tarea si sale del while 1
@@ -210,23 +304,20 @@ static void vTaskInicTimer(void *pvParameters)
 {
 	while (1)
 	{
-		uint32_t timerFreq;
 
 		/* Enable timer 1 clock */
 		Chip_TIMER_Init(LPC_TIMER0);	//Enciende el modulo
-		/* Timer rate is system clock rate */
-		timerFreq = Chip_Clock_GetSystemClockRate();					//Obtiene la frecuencia a la que esta corriendo el uC
-		/* Timer setup for match and interrupt at TICKRATE_HZ */
+
 		Chip_TIMER_Reset(LPC_TIMER0);									//Borra la cuenta
 
 		//MATCH 0: NO RESETEA LA CUENTA
 		Chip_TIMER_MatchEnableInt(LPC_TIMER0, 0);						//Habilita interrupcion del match 0 timer 0
-		Chip_TIMER_SetMatch(LPC_TIMER0, 0, (timerFreq / TICKRATE_HZ1));	//Le asigna un valor al match - seteo la frec a la que quiero que el timer me interrumpa (Ej 500ms)
+		Chip_TIMER_SetMatch(LPC_TIMER0, 0, ((SystemCoreClock / 4) / TICKRATE_HZ1));	//Le asigna un valor al match - seteo la frec a la que quiero que el timer me interrumpa (Ej 500ms)
 		Chip_TIMER_ResetOnMatchDisable(LPC_TIMER0, 0);					//Cada vez que llega al match NO resetea la cuenta
 
 		//MATCH 1: SI RESETEA LA CUENTA
 		Chip_TIMER_MatchEnableInt(LPC_TIMER0, 1);						//Habilita interrupcion del match 1 timer 0
-		Chip_TIMER_SetMatch(LPC_TIMER0, 1, (timerFreq / TICKRATE_HZ2));	//Le asigna un valor al match - seteo la frec a la que quiero que el timer me interrumpa (Ej 1s)
+		Chip_TIMER_SetMatch(LPC_TIMER0, 1, ((SystemCoreClock / 4) / TICKRATE_HZ2));	//Le asigna un valor al match - seteo la frec a la que quiero que el timer me interrumpa (Ej 1s)
 		Chip_TIMER_ResetOnMatchEnable(LPC_TIMER0, 1);					//Cada vez que llega al match resetea la cuenta
 
 		//Chip_TIMER_Enable(LPC_TIMER0);									//Comienza a contar (hago que se habilite al encender)
@@ -265,6 +356,8 @@ void TIMER0_IRQHandler(void)
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Programa principal:
 
 
 int main(void)
@@ -272,32 +365,50 @@ int main(void)
 	uC_StartUp ();
 	SystemCoreClockUpdate();
 
-	vSemaphoreCreateBinary(Semaforo_On);
+
 	vSemaphoreCreateBinary(Semaforo_PWM);
+	vSemaphoreCreateBinary(Semaforo_CAR);
+	vSemaphoreCreateBinary(Semaforo_MET);
+	vSemaphoreCreateBinary(Semaforo_NOR);
 
-	Cola_LED = xQueueCreate(1, sizeof(uint8_t));	//Creación de una cola de tamaño 1 y tipo uint8
 
-
-	xSemaphoreTake(Semaforo_On , portMAX_DELAY );//semaforo de encendido
-
+	xSemaphoreTake(Semaforo_CAR, portMAX_DELAY); //semaforo de carbono
+	xSemaphoreTake(Semaforo_MET, portMAX_DELAY); //semaforo de metano
 
 	/*
 	 * TAREA CON MAYOR PRIORIDAD (+2UL) QUE INICIALIZA EL TIMER Y LUEGO SE AUTOELIMINA
 	 * */
 	xTaskCreate(vTaskInicTimer, (char *) "vTaskInicTimer",
-				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 4UL),
+				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 3UL),
 				(xTaskHandle *) NULL);
 
 	xTaskCreate(vTaskPulsadores, (char *) "vTaskPulsadores",
 				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 1UL),
 				(xTaskHandle *) NULL);
 
-	xTaskCreate(vTaskEmergencia, (char *) "vTaskEmergencia",
-				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 3UL),
+
+	LED_Struct.semaforo = Semaforo_NOR;
+	LED_Struct.Ton = 250;
+	LED_Struct.Toff = 9750;
+
+	xTaskCreate(xTaskLed, (char *) "xTaskLedNor",
+				configMINIMAL_STACK_SIZE, &LED_Struct , (tskIDLE_PRIORITY + 1UL),
 				(xTaskHandle *) NULL);
 
-	xTaskCreate(xTaskLed, (char *) "xTaskLed",
-				configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 1UL),
+	LED_Struct.semaforo = Semaforo_CAR;
+	LED_Struct.Ton = 500;
+	LED_Struct.Toff = 500;
+
+	xTaskCreate(xTaskLed, (char *) "xTaskLedCAR",
+				configMINIMAL_STACK_SIZE, &LED_Struct, (tskIDLE_PRIORITY + 1UL),
+				(xTaskHandle *) NULL);
+
+	LED_Struct.semaforo = Semaforo_MET;
+	LED_Struct.Ton = 125;
+	LED_Struct.Toff = 125;
+
+	xTaskCreate(xTaskLed, (char *) "xTaskLedMET",
+				configMINIMAL_STACK_SIZE, &LED_Struct, (tskIDLE_PRIORITY + 1UL),
 				(xTaskHandle *) NULL);
 
 	xTaskCreate(xTaskPWM, (char *) "xTaskPWM",
