@@ -24,28 +24,28 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: 1°Parcial\ 2018.axf
+all: SD_Definitivo.axf
 
 dependents:
-	-cd D:/Facultad/Digitales\ II/Repositorio\ MCU/lpc_chip_175x_6x/Debug && $(MAKE) all
+	-cd D:/Facultad/Digitales\ II/Repositorio\ MCU/lpc_chip_175x_6x/Debug && $(MAKE) clean all
 
 # Tool invocations
-1°Parcial\ 2018.axf: $(OBJS) $(USER_OBJS) D:/Facultad/Digitales\ II/Repositorio\ MCU/lpc_chip_175x_6x/Debug/liblpc_chip_175x_6x.a
+SD_Definitivo.axf: $(OBJS) $(USER_OBJS) D:/Facultad/Digitales\ II/Repositorio\ MCU/lpc_chip_175x_6x/Debug/liblpc_chip_175x_6x.a
 	@echo 'Building target: $@'
 	@echo 'Invoking: MCU Linker'
-	arm-none-eabi-gcc -nostdlib -L"D:\Facultad\Digitales II\Repositorio MCU\lpc_chip_175x_6x\Debug" -L"D:\Facultad\Digitales II\Repositorio MCU\1°Parcial 2018" -Xlinker -Map="1°Parcial 2018.map" -Xlinker --gc-sections -Xlinker -print-memory-usage -mcpu=cortex-m3 -mthumb -T "FRTOS_Debug.ld" -o "1°Parcial 2018.axf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-none-eabi-gcc -nostdlib -L"D:\Facultad\Digitales II\Repositorio MCU\lpc_chip_175x_6x\Debug" -L"D:\Facultad\Digitales II\Repositorio MCU\1°Parcial 2018" -Xlinker -Map="SD_Definitivo.map" -Xlinker --gc-sections -Xlinker -print-memory-usage -mcpu=cortex-m3 -mthumb -T "FRTOS_Debug.ld" -o "SD_Definitivo.axf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 	$(MAKE) --no-print-directory post-build
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) "1°Parcial 2018.axf"
+	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) SD_Definitivo.axf
 	-@echo ' '
 
 post-build:
 	-@echo 'Performing post-build steps'
-	-arm-none-eabi-size "1°Parcial 2018.axf"; # arm-none-eabi-objcopy -v -O binary "1°Parcial 2018.axf" "1°Parcial 2018.bin" ; # checksum -p LPC1769 -d "1°Parcial 2018.bin";
+	-arm-none-eabi-size "SD_Definitivo.axf"; # arm-none-eabi-objcopy -v -O binary "SD_Definitivo.axf" "SD_Definitivo.bin" ; # checksum -p LPC1769 -d "SD_Definitivo.bin";
 	-@echo ' '
 
 .PHONY: all clean dependents

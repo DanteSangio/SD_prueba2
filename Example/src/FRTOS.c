@@ -17,12 +17,14 @@
 #include <cr_section_macros.h>
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "sdcard.h"
+#include "fat32.h"
+
+
 SemaphoreHandle_t Semaforo_PWM;
 SemaphoreHandle_t Semaforo_CAR;
 SemaphoreHandle_t Semaforo_MET;
 SemaphoreHandle_t Semaforo_NOR;
-
-
 
 // TODO: insert other include files here
 
